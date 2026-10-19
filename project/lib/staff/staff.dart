@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/staff/request.dart';
 import 'package:flutter_application_1/staff/staff_history.dart';
@@ -222,7 +222,7 @@ class _StaffState extends State<Staff> {
   }
 
   // เพิ่มสินทรัพย์ใหม่
-  Future<void> addAsset(String name, String description, [File? image]) async {
+  Future<void> addAsset(String name, String description, [XFile? image]) async {
     try {
       final storage = FlutterSecureStorage();
       final token = await storage.read(key: 'token');
@@ -233,7 +233,11 @@ class _StaffState extends State<Staff> {
       request.fields['description'] = description;
       if (image != null) {
         request.files.add(
-          await http.MultipartFile.fromPath('image', image.path),
+          http.MultipartFile.fromBytes(
+            'image',
+            await image.readAsBytes(),
+            filename: image.name,
+          ),
         );
       }
 
@@ -253,7 +257,7 @@ class _StaffState extends State<Staff> {
   }
 
   // ✅ เพิ่มฟังก์ชันแก้ไขสินทรัพย์
-  Future<void> _editAsset(String id, String name, [File? image]) async {
+  Future<void> _editAsset(String id, String name, [XFile? image]) async {
     try {
       final storage = FlutterSecureStorage();
       final token = await storage.read(key: 'token');
@@ -266,7 +270,11 @@ class _StaffState extends State<Staff> {
 
       if (image != null) {
         request.files.add(
-          await http.MultipartFile.fromPath('image', image.path),
+          http.MultipartFile.fromBytes(
+            'image',
+            await image.readAsBytes(),
+            filename: image.name,
+          ),
         );
       }
 
@@ -1088,7 +1096,7 @@ class _ProductRow extends StatelessWidget {
 class _ProductFormDialog extends StatefulWidget {
   final String title, initialProductName, id;
   final bool isEdit;
-  final Future<void> Function(String, String, File?) onAddAsset;
+  final Future<void> Function(String, String, XFile?) onAddAsset;
 
   const _ProductFormDialog({
     required this.title,
@@ -1104,7 +1112,8 @@ class _ProductFormDialog extends StatefulWidget {
 
 class _ProductFormDialogState extends State<_ProductFormDialog> {
   final TextEditingController controller = TextEditingController();
-  File? image;
+  XFile? image;
+  Uint8List? _imageBytes;
   bool _isLoading = false;
 
   @override
@@ -1116,7 +1125,12 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
   Future<void> pickImage() async {
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: ImageSource.gallery);
-    if (picked != null) setState(() => image = File(picked.path));
+    if (picked == null) return;
+    final bytes = await picked.readAsBytes();
+    setState(() {
+      image = picked;
+      _imageBytes = bytes;
+    });
   }
 
   void _showPopup(String title, String message, bool success) {
@@ -1184,7 +1198,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
             ),
             if (image != null) ...[
               const SizedBox(height: 10),
-              Image.file(image!, height: 100),
+              Image.memory(_imageBytes!, height: 100),
             ],
             const SizedBox(height: 20),
             Row(
